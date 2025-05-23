@@ -5,6 +5,7 @@ public class AppDbContext : DbContext
 {
     public DbSet<ATM> ATMs { get; set; }
     public DbSet<Maintenance> Maintenances { get; set; }
+    public DbSet<Supply> Supplies { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
