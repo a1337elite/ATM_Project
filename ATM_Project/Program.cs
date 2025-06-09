@@ -17,23 +17,41 @@ using (var scope = host.Services.CreateScope())
     db.Database.EnsureCreated();
 }
 
-var app = host.Services.GetRequiredService<App>();
+var services = new ServiceCollection();
+services.AddDbContext<AppDbContext>();
+services.AddSingleton<CurrencyService>();
+services.AddTransient<App>();
+
+var serviceProvider = services.BuildServiceProvider();
+
+using (var scope = serviceProvider.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
+
+var app = serviceProvider.GetRequiredService<App>();
 app.Run();
 
 public class App
 {
     private readonly AppDbContext _context;
+    private readonly CurrencyService _currencyService;
 
-    public App(AppDbContext context)
+    public App(AppDbContext context, CurrencyService currencyService)
     {
         _context = context;
+        _currencyService = currencyService;
     }
+
+    
 
     public void Run()
     {
         while (true)
         {
             Console.Clear();
+            DisplayCurrencyRates();
             Console.WriteLine("=== Система обслуживания банкоматов ==="); 
             Console.WriteLine("1. Управление банкоматами");
             Console.WriteLine("2. Управление обслуживанием");
@@ -436,15 +454,6 @@ public class App
             Console.WriteLine(new string('-', 30));
         }
     }
-
-
-
-
-
-
-
-
-    
     Console.WriteLine("\nНажмите любую клавишу для возврата...");
     Console.ReadKey();
     }
@@ -485,15 +494,38 @@ public class App
         var supplies = await _context.Supplies.Include(s => s.ATM).ToListAsync();
 
         Console.WriteLine("=== Список расходных материалов ===");
+        Console.WriteLine("Прогноз замены материалов:\n");
+
         foreach (var s in supplies)
         {
             Console.WriteLine($"ID: {s.Id}");
             Console.WriteLine($"Тип: {s.Type}");
-            Console.WriteLine($"Банкомат: {s.ATM.SerialNumber}");
+            Console.WriteLine($"Банкомат: {s.ATM.SerialNumber} ({s.ATM.Location})");
             Console.WriteLine($"Количество: {s.Quantity}");
             Console.WriteLine($"Последнее пополнение: {s.LastReplenishmentDate:dd.MM.yyyy}");
+
+            var forecast = GetSupplyForecast(s);
+            Console.ForegroundColor = forecast.color;
+            Console.WriteLine($"Прогноз замены: {forecast.message}");
+            Console.ResetColor();
+
             Console.WriteLine(new string('-', 30));
         }
+
+        Console.WriteLine("\nЛегенда:");
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.Write("Красный");
+        Console.ResetColor();
+        Console.WriteLine(" - требуется срочная замена");
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write("Желтый");
+        Console.ResetColor();
+        Console.WriteLine(" - запланируйте замену");
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write("Зеленый");
+        Console.ResetColor();
+        Console.WriteLine(" - замена не требуется");
+
         Console.WriteLine("\nНажмите любую клавишу...");
         Console.ReadKey();
     }
@@ -547,5 +579,113 @@ public class App
 
         Console.WriteLine("Материал добавлен!");
         Thread.Sleep(2000);
+    }
+
+
+
+
+
+
+
+    private async Task DisplayCurrencyRates()
+    {
+        var rates = await _currencyService.GetCurrencyRatesAsync();
+        if (rates != null)
+        {
+            Console.WriteLine();
+            Console.WriteLine("══════════════════════════════════════════");
+            Console.WriteLine($" Курсы валют ЦБ РФ на {rates.Date:dd.MM.yyyy}");
+            Console.WriteLine($" USD: {rates.Valute.USD.Value} ₽ (изменение: {rates.Valute.USD.Value - rates.Valute.USD.Previous:+#.##;-#.##;0} ₽)");
+            Console.WriteLine($" EUR: {rates.Valute.EUR.Value} ₽ (изменение: {rates.Valute.EUR.Value - rates.Valute.EUR.Previous:+#.##;-#.##;0} ₽)");
+            Console.WriteLine("══════════════════════════════════════════");
+            Console.WriteLine();
+        }
+    }
+
+
+
+
+
+
+
+    private (string message, ConsoleColor color) GetSupplyForecast(Supply supply)
+    {
+        int daysUntilReplacement;
+        string message;
+        ConsoleColor color;
+
+        switch (supply.Type)
+        {
+            case SupplyType.ReceiptPaper:
+                daysUntilReplacement = supply.Quantity * 2;
+                message = daysUntilReplacement switch
+                {
+                    < 7 => $"ТРЕБУЕТСЯ СРОЧНАЯ ЗАМЕНА! (осталось ~{daysUntilReplacement} дней)",
+                    < 30 => $"Запланируйте замену через ~{daysUntilReplacement} дней",
+                    _ => $"Замена не требуется (хватит на ~{daysUntilReplacement} дней)"
+                };
+                color = daysUntilReplacement switch
+                {
+                    < 7 => ConsoleColor.Red,
+                    < 30 => ConsoleColor.Yellow,
+                    _ => ConsoleColor.Green
+                };
+                break;
+
+            case SupplyType.InkCartridge:
+                daysUntilReplacement = supply.Quantity * 10;
+                message = daysUntilReplacement switch
+                {
+                    < 7 => $"ТРЕБУЕТСЯ СРОЧНАЯ ЗАМЕНА! (осталось ~{daysUntilReplacement} дней)",
+                    < 30 => $"Запланируйте замену через ~{daysUntilReplacement} дней",
+                    _ => $"Замена не требуется (хватит на ~{daysUntilReplacement} дней)"
+                };
+                color = daysUntilReplacement switch
+                {
+                    < 7 => ConsoleColor.Red,
+                    < 30 => ConsoleColor.Yellow,
+                    _ => ConsoleColor.Green
+                };
+                break;
+
+            case SupplyType.CleaningKit:
+                daysUntilReplacement = supply.Quantity * 15;
+                message = daysUntilReplacement switch
+                {
+                    < 7 => $"ТРЕБУЕТСЯ СРОЧНАЯ ЗАМЕНА! (осталось ~{daysUntilReplacement} дней)",
+                    < 30 => $"Запланируйте замену через ~{daysUntilReplacement} дней",
+                    _ => $"Замена не требуется (хватит на ~{daysUntilReplacement} дней)"
+                };
+                color = daysUntilReplacement switch
+                {
+                    < 7 => ConsoleColor.Red,
+                    < 30 => ConsoleColor.Yellow,
+                    _ => ConsoleColor.Green
+                };
+                break;
+
+            case SupplyType.RibbonModule:
+                daysUntilReplacement = supply.Quantity * 15;
+                message = daysUntilReplacement switch
+                {
+                    < 7 => $"ТРЕБУЕТСЯ СРОЧНАЯ ЗАМЕНА! (осталось ~{daysUntilReplacement} дней)",
+                    < 30 => $"Запланируйте замену через ~{daysUntilReplacement} дней",
+                    _ => $"Замена не требуется (хватит на ~{daysUntilReplacement} дней)"
+                };
+                color = daysUntilReplacement switch
+                {
+                    < 7 => ConsoleColor.Red,
+                    < 30 => ConsoleColor.Yellow,
+                    _ => ConsoleColor.Green
+                };
+                break;
+
+            default:
+                message = "Неизвестный тип материала";
+                color = ConsoleColor.Gray;
+                break;
+        }
+
+        return (message, color);
     }
 }
