@@ -44,7 +44,7 @@ public class App
         _currencyService = currencyService;
     }
 
-    
+
 
     public void Run()
     {
@@ -52,10 +52,10 @@ public class App
         {
             Console.Clear();
             DisplayCurrencyRates();
-            Console.WriteLine("=== Система обслуживания банкоматов ==="); 
+            Console.WriteLine("=== Система обслуживания банкоматов ===");
             Console.WriteLine("1. Управление банкоматами");
             Console.WriteLine("2. Управление обслуживанием");
-            Console.WriteLine("3. Управление расходными материалами"); 
+            Console.WriteLine("3. Управление расходными материалами");
             Console.WriteLine("4. Выход");
             Console.Write("Выберите действие: ");
 
@@ -412,50 +412,50 @@ public class App
     }
 
     private async Task FindMaintenancesByATM()
-{
-    Console.Clear();
-    Console.WriteLine("=== Поиск обслуживаний по банкомату ===");
-    
-    Console.Write("Введите ID банкомата: ");
-    if (!int.TryParse(Console.ReadLine(), out var atmId))
     {
-        Console.WriteLine("Неверный формат ID!");
-        Thread.Sleep(2000);
-        return;
-    }
+        Console.Clear();
+        Console.WriteLine("=== Поиск обслуживаний по банкомату ===");
 
-    var atm = await _context.ATMs.FindAsync(atmId);
-    if (atm == null)
-    {
-        Console.WriteLine("Банкомат не найден!");
-        Thread.Sleep(2000);
-        return;
-    }
-
-    var maintenances = await _context.Maintenances
-        .Where(m => m.ATMId == atmId)
-        .OrderByDescending(m => m.MaintenanceDate)
-        .ToListAsync();
-
-    Console.WriteLine($"\nИстория обслуживания банкомата {atm.SerialNumber} ({atm.Location}):");
-    
-    if (!maintenances.Any())
-    {
-        Console.WriteLine("Нет записей об обслуживании");
-    }
-    else
-    {
-        foreach (var m in maintenances)
+        Console.Write("Введите ID банкомата: ");
+        if (!int.TryParse(Console.ReadLine(), out var atmId))
         {
-            Console.WriteLine($"Дата: {m.MaintenanceDate:dd.MM.yyyy}");
-            Console.WriteLine($"Тип: {m.ServiceType}");
-            Console.WriteLine($"Техник: {m.TechnicianName}");
-            Console.WriteLine($"Описание: {m.Description}");
-            Console.WriteLine(new string('-', 30));
+            Console.WriteLine("Неверный формат ID!");
+            Thread.Sleep(2000);
+            return;
         }
-    }
-    Console.WriteLine("\nНажмите любую клавишу для возврата...");
-    Console.ReadKey();
+
+        var atm = await _context.ATMs.FindAsync(atmId);
+        if (atm == null)
+        {
+            Console.WriteLine("Банкомат не найден!");
+            Thread.Sleep(2000);
+            return;
+        }
+
+        var maintenances = await _context.Maintenances
+            .Where(m => m.ATMId == atmId)
+            .OrderByDescending(m => m.MaintenanceDate)
+            .ToListAsync();
+
+        Console.WriteLine($"\nИстория обслуживания банкомата {atm.SerialNumber} ({atm.Location}):");
+
+        if (!maintenances.Any())
+        {
+            Console.WriteLine("Нет записей об обслуживании");
+        }
+        else
+        {
+            foreach (var m in maintenances)
+            {
+                Console.WriteLine($"Дата: {m.MaintenanceDate:dd.MM.yyyy}");
+                Console.WriteLine($"Тип: {m.ServiceType}");
+                Console.WriteLine($"Техник: {m.TechnicianName}");
+                Console.WriteLine($"Описание: {m.Description}");
+                Console.WriteLine(new string('-', 30));
+            }
+        }
+        Console.WriteLine("\nНажмите любую клавишу для возврата...");
+        Console.ReadKey();
     }
 
     private async void ShowSuppliesMenu()
@@ -688,4 +688,5 @@ public class App
 
         return (message, color);
     }
+
 }
